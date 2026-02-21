@@ -13,10 +13,17 @@ BuildAAgent is a consumer-first platform that lets non-technical users deploy th
 
 ## Packages
 
-- **`buildaagent`** — The agent runtime engine
-- **`buildaagent-web`** — Control plane frontend (Next.js)  
+- **`buildaagent`** — The agent runtime engine (HTTP API)
+- **`buildaagent-mobile`** — React Native mobile client (Primary interface)  
+- **`buildaagent-web`** — Web management interface (Phase 3+)
 - **`buildaagent-site`** — Marketing site
-- **`buildaagent-infra`** — Shell scripts and Docker Compose templates for tenant provisioning
+- **`buildaagent-infra`** — Hostinger API scripts and Docker templates for tenant provisioning
+
+### Development Phases
+
+**Phase 1** (Current): Core validation with mobile-first approach  
+**Phase 2**: Infrastructure automation and deployment  
+**Phase 3**: Web-based onboarding and management interface
 
 ## Infrastructure
 

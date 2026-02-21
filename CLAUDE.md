@@ -51,12 +51,15 @@
 ```
 buildaagent/
 ├── packages/
-│   ├── buildaagent/              # ✅ Runtime engine scaffolded
-│   ├── buildaagent-web/          # → Will become admin panel
-│   ├── buildaagent-site/         # ✅ Marketing site (Next.js)
-│   └── buildaagent-infra/        # ✅ Hostinger API scripts
-└── buildaagent-mobile/           # 🔜 Brandon will add RN client
+│   ├── buildaagent/              # 🎯 HTTP API runtime (Phase 1)
+│   ├── buildaagent-mobile/       # 🎯 React Native app (Phase 1) 
+│   ├── buildaagent-site/         # 📄 Marketing site (Phase 2)
+│   ├── buildaagent-infra/        # 🏗️ Infrastructure scripts (Phase 2)
+│   └── buildaagent-web/          # 🌐 Management hub (Phase 3+)
 ```
+
+**Phase 1 Focus**: Runtime + Mobile App only  
+**buildaagent-web**: Skeleton kept for future onboarding/management interface
 
 ## 🎯 Phase 1: Core Validation (Current)
 
@@ -123,11 +126,13 @@ first_message: "Hey! I'm your personal assistant..."
 - [ ] Test persona loading and behavior changes
 
 **Brandon's Tasks**:
-- [ ] Initialize React Native client in `/buildaagent-mobile`
+- [ ] Initialize React Native client in `packages/buildaagent-mobile/`
 - [ ] Build chat interface UI
 - [ ] Implement persona switching
 - [ ] HTTP API integration
 - [ ] Push notifications setup (for later phases)
+
+**buildaagent-web**: Kept as skeleton for Phase 3+ onboarding/management interface
 
 ## 🎪 Demo Flow (Phase 1 Target)
 
@@ -138,13 +143,23 @@ first_message: "Hey! I'm your personal assistant..."
 5. Send same message → Creative, engaging response style
 6. Proves persona-as-config actually works!
 
-## 🔄 Phase 2 Preview
+## 📋 Development Phases
 
-After Phase 1 validation:
-- Hostinger VM provisioning (each user gets own agent API)
-- Tenant management in RN app
-- Production deployment pipeline
-- More personas and skills
+### Phase 1: Core Validation (Current)
+- 🎯 **buildaagent** (HTTP API runtime)
+- 🎯 **buildaagent-mobile** (React Native client)
+- Goal: Prove persona-as-config works with mobile interface
+
+### Phase 2: Infrastructure & Deployment  
+- 🏗️ **buildaagent-infra** (Hostinger VM provisioning)
+- 📄 **buildaagent-site** (Marketing site + domain)
+- Goal: Multi-tenant deployment pipeline
+
+### Phase 3: Onboarding & Management
+- 🌐 **buildaagent-web** (Persona builder + account management)
+- Goal: Non-technical user onboarding flow
+- Desktop interface for complex configuration
+- Analytics dashboard, billing, advanced settings
 
 ## 🔐 Secrets Management
 

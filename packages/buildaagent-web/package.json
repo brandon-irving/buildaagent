@@ -1,7 +1,7 @@
 {
   "name": "buildaagent-web",
   "version": "0.1.0",
-  "description": "Control plane frontend - persona builder and agent management",
+  "description": "Web management interface - onboarding, persona builder, and analytics dashboard (Phase 3+)",
   "private": true,
   "scripts": {
     "dev": "next dev",
