@@ -8,7 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=buildaagent-web",
+    "dev": "npm run dev --workspace=buildaagent",
+    "dev:mobile": "npm start --workspace=buildaagent-mobile",
+    "dev:api": "npm run dev --workspace=buildaagent",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
