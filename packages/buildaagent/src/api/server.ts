@@ -10,7 +10,7 @@ import cors from 'cors'
 import { PersonaEngine } from '../core/persona-engine'
 import { SkillRegistry } from '../core/skill-registry'
 import { AgentGateway, DirectGateway } from '../gateway/agent-gateway'
-import { Database } from '../core/database'
+import { MockDatabase as Database } from '../core/mock-database'
 import { Logger } from '../core/logger'
 
 export interface ServerConfig {

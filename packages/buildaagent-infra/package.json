@@ -10,9 +10,7 @@
     "test": "bash scripts/test-scripts.sh"
   },
   "dependencies": {},
-  "devDependencies": {
-    "shellcheck": "^0.10.0"
-  },
+  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   },

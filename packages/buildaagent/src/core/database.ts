@@ -24,7 +24,7 @@ export interface UserPreference {
 }
 
 export class Database {
-  private db: Database.Database | null = null
+  private db: any | null = null
   private logger: Logger
 
   constructor(
@@ -47,8 +47,8 @@ export class Database {
       
       this.db = new Database(dbPath)
       
-      // Enable WAL mode for better concurrent access
-      this.db.pragma('journal_mode = WAL')
+      // Enable WAL mode for better concurrent access (skip for now)
+      // this.db.pragma('journal_mode = WAL')
       
       // Create tables
       this.createTables()

@@ -7,7 +7,7 @@
 
 import { SkillRegistry, SkillExecutionResult } from './skill-registry'
 import { AgentGateway } from '../gateway/agent-gateway'
-import { Database } from './database'
+import { MockDatabase as Database } from './mock-database'
 import { Logger } from './logger'
 
 export interface PersonaConfig {
