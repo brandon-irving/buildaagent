@@ -5,8 +5,16 @@
  * Loads configuration from environment variables
  */
 
-import { BuildAAgentServer, ServerConfig } from './api/server'
+import dotenv from 'dotenv'
 import path from 'path'
+
+// Load env files: package-level first, then monorepo root as fallback
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+dotenv.config({ path: path.resolve(process.cwd(), '.env') })
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env.local') })
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') })
+
+import { BuildAAgentServer, ServerConfig } from './api/server'
 
 function getConfig(): ServerConfig {
   const config: ServerConfig = {
@@ -29,9 +37,12 @@ async function main() {
   try {
     const config = getConfig()
     
+    const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY)
+
     console.log('Configuration:')
     console.log(`  Port: ${config.port}`)
     console.log(`  AI Provider: ${config.aiProvider}`)
+    console.log(`  API Key: ${hasApiKey ? 'loaded' : '⚠️  MISSING'}`)
     console.log(`  Log Level: ${config.logLevel}`)
     console.log(`  Workspace: ${config.workspacePath}`)
     console.log(`  Personas: ${config.personasPath}`)

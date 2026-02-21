@@ -8,6 +8,7 @@ import {
   StatusBar,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Persona } from '../types';
 import { apiService } from '../services/api';
 import { ChatInterface } from '../components/ChatInterface';
@@ -47,7 +48,7 @@ export const HomeScreen: React.FC = () => {
     
     if (result.success && result.data) {
       setPersonas(result.data);
-      setSelectedPersona(result.data[0]); // Select first persona by default
+      setSelectedPersona(result.data[0]);
     } else {
       Alert.alert('Error', result.error || 'Failed to load personas');
       loadMockPersonas();
@@ -93,16 +94,16 @@ export const HomeScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading BuildAAgent...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!serverConnected && personas.length === 0) {
     return (
-      <View style={styles.errorContainer}>
+      <SafeAreaView style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Connection Error</Text>
         <Text style={styles.errorText}>
           Cannot connect to the API server.{'\n'}
@@ -111,13 +112,13 @@ export const HomeScreen: React.FC = () => {
         <TouchableOpacity style={styles.retryButton} onPress={checkServerConnection}>
           <Text style={styles.retryButtonText}>Retry Connection</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
       
       {/* Connection Status */}
       {!serverConnected && (
@@ -137,7 +138,7 @@ export const HomeScreen: React.FC = () => {
       {selectedPersona && (
         <ChatInterface persona={selectedPersona} />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

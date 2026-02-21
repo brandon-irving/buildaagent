@@ -113,7 +113,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ persona }) => {
         <Text style={styles.personaDescription}>{persona.description}</Text>
       </View>
 
-      {/* Messages */}
+      {/* Messages – takes remaining space */}
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -158,18 +158,18 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#007AFF',
-    padding: 16,
-    paddingTop: 60, // Account for status bar
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   personaName: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#fff',
   },
   personaDescription: {
-    fontSize: 14,
-    color: '#E0E0E0',
-    marginTop: 4,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
   },
   messagesList: {
     flex: 1,

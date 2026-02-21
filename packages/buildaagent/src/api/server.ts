@@ -185,7 +185,10 @@ export class BuildAAgentServer {
             id: personaId,
             name: persona.name,
             description: persona.description,
-            version: persona.version
+            version: persona.version,
+            behavior: persona.behavior,
+            skills: persona.skills,
+            first_message: persona.first_message,
           })
         } catch (error) {
           this.logger.warn(`Failed to parse persona file ${file}:`, error)

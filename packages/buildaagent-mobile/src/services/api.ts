@@ -28,7 +28,7 @@ class ApiService {
       const response = await axios.get(`${this.baseURL}${API_CONFIG.endpoints.personas}`);
       return {
         success: true,
-        data: response.data,
+        data: response.data.personas ?? response.data,
       };
     } catch (error: any) {
       console.error('Failed to fetch personas:', error);
