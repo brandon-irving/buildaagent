@@ -13,23 +13,32 @@ React Native/Expo mobile client for BuildAAgent - your personal AI agent platfor
 ## Prerequisites
 
 - Node.js 18+
+- pnpm (`npm install -g pnpm`)
 - Expo CLI (`npm install -g @expo/cli`)
 - BuildAAgent API server running (see `../buildaagent/README.md`)
 
 ## Installation
 
+From the monorepo root:
+
 ```bash
-cd packages/buildaagent-mobile
-npm install
+pnpm install
 ```
 
 ## Development
 
 ### Start the development server:
 
+From the monorepo root:
+
 ```bash
-npm start
-# or
+pnpm dev:mobile
+```
+
+Or directly with Expo:
+
+```bash
+cd packages/buildaagent-mobile
 npx expo start
 ```
 
@@ -99,15 +108,16 @@ src/
 
 1. Start the BuildAAgent API server:
    ```bash
-   cd ../buildaagent
-   npm run dev
+   # From monorepo root
+   pnpm dev:api
    ```
 
 2. Update API config with your IP address (for device testing)
 
 3. Start the mobile app:
    ```bash
-   npm start
+   # From monorepo root  
+   pnpm dev:mobile
    ```
 
 ### Offline Mode
@@ -161,12 +171,12 @@ The app uses a consistent design system:
 - Check firewall settings if testing on physical device
 
 ### TypeScript errors
-- Run `npm install` to ensure all dependencies are installed
+- Run `pnpm install` from monorepo root to ensure all dependencies are installed
 - Check that all required packages are properly installed
 
 ### Expo build issues
 - Clear cache: `npx expo r -c`
-- Reinstall node_modules: `rm -rf node_modules && npm install`
+- Reinstall node_modules: `rm -rf node_modules && pnpm install` (from monorepo root)
 
 ## Next Steps
 

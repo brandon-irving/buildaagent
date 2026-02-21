@@ -31,16 +31,40 @@ Built on Hostinger VPS with native Docker support. Tenant provisioning managed v
 
 ## Development
 
+This is a pnpm workspace monorepo. Install pnpm globally first:
+
 ```bash
-# Install dependencies
-npm install
-
-# Start development servers
-npm run dev
-
-# Build all packages
-npm run build
+npm install -g pnpm
 ```
+
+Then install all dependencies:
+
+```bash
+pnpm install
+```
+
+### API Server
+
+```bash
+export ANTHROPIC_API_KEY="your-key-here"
+pnpm dev:api
+```
+
+API available at: http://localhost:3000
+
+### Mobile App
+
+```bash
+pnpm dev:mobile
+```
+
+### All Scripts
+
+- `pnpm dev:api` - Start the HTTP API server
+- `pnpm dev:mobile` - Start the React Native/Expo development server  
+- `pnpm build` - Build all packages
+- `pnpm test` - Run tests across all packages
+- `pnpm lint` - Lint all packages
 
 ## License
 

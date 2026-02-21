@@ -4,16 +4,13 @@
   "private": true,
   "description": "Build-A-Bear for AI agents - deploy personalized autonomous AI agents",
   "main": "index.js",
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "npm run dev --workspace=buildaagent",
-    "dev:mobile": "npm start --workspace=buildaagent-mobile",
-    "dev:api": "npm run dev --workspace=buildaagent",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces",
+    "dev": "pnpm --filter buildaagent dev",
+    "dev:mobile": "pnpm --filter buildaagent-mobile start",
+    "dev:api": "pnpm --filter buildaagent dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/build"
   },
   "keywords": [
@@ -32,6 +29,6 @@
   },
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "pnpm": ">=8.0.0"
   }
 }
