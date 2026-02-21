@@ -1,0 +1,105 @@
+# Email Manager Skill Manifest
+# Handles Gmail integration for reading and sending emails
+
+name: "email-manager"
+version: "1.2.0"
+description: "Gmail integration for reading, sending, and organizing emails"
+
+# Skill metadata
+author: "BuildAAgent Team"
+license: "MIT"
+tags: ["email", "gmail", "productivity", "communication"]
+
+# Authentication requirements
+auth_requirements:
+  - type: "oauth2"
+    provider: "gmail"
+    scopes: 
+      - "https://www.googleapis.com/auth/gmail.readonly"
+      - "https://www.googleapis.com/auth/gmail.send"
+      - "https://www.googleapis.com/auth/gmail.labels"
+
+# Skill capabilities - what this skill can do
+capabilities:
+  - name: "read_emails"
+    description: "Read and search through emails"
+    parameters:
+      - name: "query"
+        type: "string"
+        description: "Search query (optional)"
+      - name: "limit"
+        type: "number"
+        default: 20
+        description: "Max number of emails to return"
+
+  - name: "send_email"
+    description: "Send an email to specified recipients"
+    parameters:
+      - name: "to"
+        type: "string[]"
+        required: true
+        description: "Recipient email addresses"
+      - name: "subject"
+        type: "string"
+        required: true
+        description: "Email subject line"
+      - name: "body"
+        type: "string" 
+        required: true
+        description: "Email body content"
+      - name: "cc"
+        type: "string[]"
+        description: "CC recipients"
+
+  - name: "organize_emails"
+    description: "Apply labels and organize emails"
+    parameters:
+      - name: "email_ids"
+        type: "string[]"
+        required: true
+      - name: "labels"
+        type: "string[]"
+        required: true
+
+# Dependencies on other skills or services
+dependencies:
+  - skill: "web-auth"
+    version: ">=1.0.0"
+    reason: "OAuth2 authentication flow"
+
+# Configuration schema
+config_schema:
+  type: "object"
+  properties:
+    signature:
+      type: "string"
+      description: "Default email signature"
+    auto_reply:
+      type: "boolean"
+      default: false
+      description: "Enable automatic replies"
+    priority_senders:
+      type: "array"
+      items:
+        type: "string"
+      description: "Email addresses to prioritize"
+
+# Resource requirements
+resources:
+  memory_mb: 128
+  cpu_cores: 0.1
+  storage_mb: 50
+
+# Skill lifecycle hooks
+hooks:
+  on_install: "setup_gmail_auth.js"
+  on_enable: "check_auth_status.js" 
+  on_disable: "revoke_tokens.js"
+  on_uninstall: "cleanup.js"
+
+# Governance constraints
+governance:
+  max_api_calls_per_hour: 1000
+  sensitive_data_handling: true
+  external_requests: ["*.googleapis.com"]
+  required_permissions: ["email_read", "email_send"]

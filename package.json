@@ -1,0 +1,35 @@
+{
+  "name": "buildaagent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build-A-Bear for AI agents - deploy personalized autonomous AI agents",
+  "main": "index.js",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=buildaagent-web",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "saas",
+    "persona",
+    "automation",
+    "openclaw"
+  ],
+  "author": "Brandon Irving",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brandon-irving/buildaagent.git"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "buildaagent-infra",
+  "version": "0.1.0",
+  "description": "Shell scripts and Docker Compose templates for tenant provisioning",
+  "main": "index.js",
+  "scripts": {
+    "provision": "bash scripts/provision-tenant.sh",
+    "teardown": "bash scripts/teardown-tenant.sh",
+    "status": "bash scripts/status.sh",
+    "test": "bash scripts/test-scripts.sh"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "shellcheck": "^0.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["infrastructure", "docker", "provisioning", "hostinger"]
+}

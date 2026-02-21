@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  buildaagent-runtime:
+    image: buildaagent/runtime:latest
+    container_name: buildaagent-${TENANT_ID}
+    restart: unless-stopped
+    environment:
+      - TENANT_ID=${TENANT_ID}
+      - AI_PROVIDER=${AI_PROVIDER:-anthropic}
+      - AI_KEY_REF=${AI_KEY_REF}
+      - PERSONA_CONFIG=${PERSONA_CONFIG:-personal-assistant}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=production
+    volumes:
+      # Persistent tenant workspace
+      - ./volumes/${TENANT_ID}/workspace:/app/workspace
+      - ./volumes/${TENANT_ID}/memory:/app/memory
+      - ./volumes/${TENANT_ID}/browser:/app/browser
+      # Encrypted secrets
+      - ./volumes/${TENANT_ID}/.env:/app/.env:ro
+      # Persona configurations
+      - ./personas:/app/personas:ro
+    ports:
+      - "${PORT:-3000}:3000"
+    networks:
+      - buildaagent
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Chrome browser for agent UI automation
+  chrome:
+    image: browserless/chrome:latest
+    container_name: chrome-${TENANT_ID}
+    restart: unless-stopped
+    environment:
+      - CONNECTION_TIMEOUT=60000
+      - MAX_CONCURRENT_SESSIONS=1
+      - ENABLE_DEBUGGER=false
+    volumes:
+      - ./volumes/${TENANT_ID}/browser-data:/tmp
+    networks:
+      - buildaagent
+    depends_on:
+      - buildaagent-runtime
+
+networks:
+  buildaagent:
+    name: buildaagent-${TENANT_ID}
+    driver: bridge
+
+volumes:
+  workspace:
+    driver: local
+    driver_opts:
+      type: none
+      device: /opt/buildaagent/tenants/${TENANT_ID}/workspace
+      o: bind
+  memory:
+    driver: local
+    driver_opts:
+      type: none
+      device: /opt/buildaagent/tenants/${TENANT_ID}/memory
+      o: bind
+  browser:
+    driver: local
+    driver_opts:
+      type: none
+      device: /opt/buildaagent/tenants/${TENANT_ID}/browser
+      o: bind
