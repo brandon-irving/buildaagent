@@ -180,6 +180,24 @@ export class BuildAAgentServer {
       this.app.use('/api/tokens', createTokenBridgeRouter(this.tokenStore, this.logger))
     }
 
+    // Debug endpoint - show database state
+    this.app.get('/api/debug/database', async (req, res) => {
+      try {
+        const stats = await this.database.getStats()
+        const allTokens = (this.database as any).oauthTokens || new Map()
+        const tokenKeys = Array.from(allTokens.keys())
+        
+        res.json({
+          database_stats: stats,
+          oauth_tokens_stored: tokenKeys,
+          oauth_count: allTokens.size,
+          token_store_enabled: !!this.tokenStore
+        })
+      } catch (error: any) {
+        res.status(500).json({ error: error.message })
+      }
+    })
+
     // Services status endpoint
     this.app.get('/api/services/status', async (req, res) => {
       try {
