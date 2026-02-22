@@ -10,7 +10,7 @@ import cors from 'cors'
 import { PersonaEngine } from '../core/persona-engine'
 import { SkillRegistry } from '../core/skill-registry'
 import { AgentGateway, DirectGateway } from '../gateway/agent-gateway'
-import { OpenClawGateway, OpenClawConfig } from '../gateway/openclaw-gateway'
+import { OpenClawGatewaySimple as OpenClawGateway, OpenClawConfig } from '../gateway/openclaw-gateway-simple'
 import { MockDatabase as Database } from '../core/mock-database'
 import { Logger } from '../core/logger'
 import { TokenStore } from '../services/token-store'
@@ -32,6 +32,8 @@ export interface ServerConfig {
     agentId?: string
     model?: string
     sessionPrefix?: string
+    authToken?: string
+    timeout?: number
   }
 }
 
@@ -119,7 +121,7 @@ export class BuildAAgentServer {
       try {
         const health = await this.healthCheck()
         res.json(health)
-      } catch (error) {
+      } catch (error: any) {
         res.status(500).json({ 
           status: 'unhealthy', 
           error: error.message 
@@ -132,7 +134,7 @@ export class BuildAAgentServer {
       try {
         const personas = await this.getAvailablePersonas()
         res.json({ personas })
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error('Error fetching personas:', error)
         res.status(500).json({ error: 'Failed to fetch personas' })
       }
@@ -144,7 +146,7 @@ export class BuildAAgentServer {
         const { personaId } = req.params
         const persona = await this.getPersonaDetails(personaId)
         res.json({ persona })
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Error fetching persona ${req.params.personaId}:`, error)
         res.status(404).json({ error: 'Persona not found' })
       }
@@ -166,7 +168,7 @@ export class BuildAAgentServer {
         )
 
         res.json(response)
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error('Error processing chat message:', error)
         res.status(500).json({ error: 'Failed to process message' })
       }
@@ -273,13 +275,13 @@ export class BuildAAgentServer {
             skills: persona.skills,
             first_message: persona.first_message,
           })
-        } catch (error) {
+        } catch (error: any) {
           this.logger.warn(`Failed to parse persona file ${file}:`, error)
         }
       }
       
       return personas
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Error reading personas directory:', error)
       return []
     }
@@ -300,7 +302,7 @@ export class BuildAAgentServer {
         id: personaId,
         ...persona
       }
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Persona ${personaId} not found`)
     }
   }
@@ -368,7 +370,7 @@ export class BuildAAgentServer {
           this.logger.info(`   GET  /api/tokens/status - Token status for OpenClaw`)
         }
       })
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('❌ Failed to start server:', error)
       throw error
     }

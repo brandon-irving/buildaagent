@@ -30,10 +30,12 @@ function getConfig(): ServerConfig {
   // Add OpenClaw configuration if using openclaw provider
   if (config.aiProvider === 'openclaw') {
     config.openclaw = {
-      gatewayUrl: process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789', // For reference only
+      gatewayUrl: process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789',
       agentId: process.env.OPENCLAW_AGENT_ID,
       model: process.env.OPENCLAW_MODEL || 'sonnet',
-      sessionPrefix: process.env.OPENCLAW_SESSION_PREFIX || 'buildaagent'
+      sessionPrefix: process.env.OPENCLAW_SESSION_PREFIX || 'buildaagent',
+      authToken: process.env.OPENCLAW_AUTH_TOKEN,
+      timeout: parseInt(process.env.OPENCLAW_TIMEOUT || '45000')
     }
   }
 
