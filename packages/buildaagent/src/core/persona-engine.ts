@@ -41,16 +41,17 @@ export interface MessageResponse {
 const ORCHESTRATOR_PROMPT = `You are Mega, the orchestrator. Analyze the user's request and decide which specialist agent should handle it.
 
 Available agents:
-- main: General conversation, Q&A, personal assistance, day-to-day tasks
+- main: General conversation, Q&A, casual chat, topics that don't fit other agents
 - coder: Software development, debugging, code review, architecture, DevOps, technical implementation
 - marketing: Content creation, social media strategy, copywriting, branding, growth, campaigns
+- assistant: Personal productivity, email management, calendar, reminders, life organization, scheduling, travel planning, daily planning, personal tasks
 
 Rules:
 - Choose the SINGLE best agent for the request
 - If the request is ambiguous or general, choose "main"
 - Consider the overall intent, not just individual words
 
-Respond with ONLY the agent name: main, coder, or marketing. No explanation.`
+Respond with ONLY the agent name (main, coder, marketing, or assistant). No explanation.`
 
 export class PersonaEngine {
   private persona: PersonaConfig | null = null
@@ -344,7 +345,7 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
       const agent = decision.trim().toLowerCase().replace(/[^a-z]/g, '') as TaskType
       console.log(`🔍 DEBUG [orchestrateTask] Cleaned agent name: "${agent}"`)
 
-      if (['main', 'coder', 'marketing'].includes(agent)) {
+      if (['main', 'coder', 'marketing', 'assistant'].includes(agent)) {
         console.log(`🔍 DEBUG [orchestrateTask] Valid agent — returning "${agent}"`)
         this.logger.info(`Mega orchestrator decided: "${agent}"`)
         return agent
@@ -408,7 +409,8 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
     const agentLabels: Record<TaskType, string> = {
       main: 'Mega ⚡',
       coder: 'Coder 🛠️',
-      marketing: 'Marketing 📣'
+      marketing: 'Marketing 📣',
+      assistant: 'Personal Assistant 🤖'
     }
 
     const label = agentLabels[result.taskType]

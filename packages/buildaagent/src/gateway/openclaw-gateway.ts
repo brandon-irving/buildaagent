@@ -9,7 +9,7 @@
 import { AgentGateway, HealthCheckResult } from './agent-gateway'
 import { Logger } from '../core/logger'
 
-export type TaskType = 'main' | 'coder' | 'marketing'
+export type TaskType = 'main' | 'coder' | 'marketing' | 'assistant'
 
 export interface DelegationResult {
   taskType: TaskType
@@ -193,7 +193,8 @@ export class OpenClawGateway implements AgentGateway {
     const agentMap: Record<TaskType, string> = {
       main: this.agentId,
       coder: 'coder',
-      marketing: 'marketing'
+      marketing: 'marketing',
+      assistant: 'assistant'
     }
 
     const targetAgent = agentMap[taskType]
