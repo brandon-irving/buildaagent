@@ -10,21 +10,29 @@ import cors from 'cors'
 import { PersonaEngine } from '../core/persona-engine'
 import { SkillRegistry } from '../core/skill-registry'
 import { AgentGateway, DirectGateway } from '../gateway/agent-gateway'
+import { OpenClawGateway, OpenClawConfig } from '../gateway/openclaw-gateway'
 import { MockDatabase as Database } from '../core/mock-database'
 import { Logger } from '../core/logger'
 import { TokenStore } from '../services/token-store'
 import { GmailService } from '../services/gmail/gmail-service'
 import { createEmailManagerExecutor } from '../skills/email-manager/executor'
 import { createAuthRouter } from './routes/auth'
+import { createTokenBridgeRouter } from './routes/tokens'
 
 export interface ServerConfig {
   port: number
   logLevel: 'debug' | 'info' | 'warn' | 'error'
-  aiProvider: 'anthropic' | 'openai'
+  aiProvider: 'anthropic' | 'openai' | 'openclaw'
   aiKeyRef: string
   workspacePath: string
   personasPath: string
   skillsPath: string
+  openclaw?: {
+    gatewayUrl: string
+    agentId?: string
+    model?: string
+    sessionPrefix?: string
+  }
 }
 
 export class BuildAAgentServer {
@@ -43,12 +51,30 @@ export class BuildAAgentServer {
     this.logger = new Logger(config.logLevel)
     this.database = new Database('api-server', config.workspacePath)
     this.skillRegistry = new SkillRegistry(this.logger)
-    this.gateway = new DirectGateway(config.aiProvider, config.aiKeyRef)
+    this.gateway = this.createGateway(config)
     this.gmailService = new GmailService(this.logger)
 
     this.setupMiddleware()
     this.setupGmailIntegration()
     this.setupRoutes()
+  }
+
+  private createGateway(config: ServerConfig): AgentGateway {
+    if (config.aiProvider === 'openclaw') {
+      if (!config.openclaw) {
+        throw new Error('OpenClaw configuration required when using openclaw provider')
+      }
+      
+      this.logger.info('Creating OpenClaw gateway', { 
+        gatewayUrl: config.openclaw.gatewayUrl,
+        agentId: config.openclaw.agentId 
+      })
+      
+      return new OpenClawGateway(config.openclaw, this.logger)
+    } else {
+      this.logger.info('Creating direct gateway', { provider: config.aiProvider })
+      return new DirectGateway(config.aiProvider, config.aiKeyRef)
+    }
   }
 
   private setupGmailIntegration(): void {
@@ -149,6 +175,7 @@ export class BuildAAgentServer {
     // Auth routes (Gmail OAuth)
     if (this.tokenStore) {
       this.app.use('/api/auth', createAuthRouter(this.tokenStore, this.logger))
+      this.app.use('/api/tokens', createTokenBridgeRouter(this.tokenStore, this.logger))
     }
 
     // Services status endpoint
@@ -337,6 +364,8 @@ export class BuildAAgentServer {
           this.logger.info(`   GET  /api/auth/gmail/status - Gmail connection status`)
           this.logger.info(`   POST /api/auth/gmail/disconnect - Disconnect Gmail`)
           this.logger.info(`   GET  /api/services/status - Connected services status`)
+          this.logger.info(`   GET  /api/tokens/:service/access-token - Token bridge for OpenClaw`)
+          this.logger.info(`   GET  /api/tokens/status - Token status for OpenClaw`)
         }
       })
     } catch (error) {

@@ -27,6 +27,16 @@ function getConfig(): ServerConfig {
     skillsPath: process.env.SKILLS_PATH || path.join(process.cwd(), 'src', 'skills')
   }
 
+  // Add OpenClaw configuration if using openclaw provider
+  if (config.aiProvider === 'openclaw') {
+    config.openclaw = {
+      gatewayUrl: process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:8080',
+      agentId: process.env.OPENCLAW_AGENT_ID,
+      model: process.env.OPENCLAW_MODEL || 'sonnet',
+      sessionPrefix: process.env.OPENCLAW_SESSION_PREFIX || 'buildaagent'
+    }
+  }
+
   return config
 }
 
@@ -42,7 +52,15 @@ async function main() {
     console.log('Configuration:')
     console.log(`  Port: ${config.port}`)
     console.log(`  AI Provider: ${config.aiProvider}`)
-    console.log(`  API Key: ${hasApiKey ? 'loaded' : '⚠️  MISSING'}`)
+    
+    if (config.aiProvider === 'openclaw') {
+      console.log(`  OpenClaw Gateway: ${config.openclaw?.gatewayUrl || 'not configured'}`)
+      console.log(`  OpenClaw Agent ID: ${config.openclaw?.agentId || 'default'}`)
+      console.log(`  OpenClaw Model: ${config.openclaw?.model || 'sonnet'}`)
+    } else {
+      console.log(`  API Key: ${hasApiKey ? 'loaded' : '⚠️  MISSING'}`)
+    }
+    
     console.log(`  Log Level: ${config.logLevel}`)
     console.log(`  Workspace: ${config.workspacePath}`)
     console.log(`  Personas: ${config.personasPath}`)
