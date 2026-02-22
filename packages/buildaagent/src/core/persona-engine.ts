@@ -392,7 +392,7 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
 
     try {
       console.log(`🔍 DEBUG [delegateTask] Calling gateway.delegateToAgent("${taskType}", ...)`)
-      const result = await this.gateway.delegateToAgent(taskType, delegationPrompt)
+      const result = await this.gateway.delegateToAgent(taskType, delegationPrompt, userId)
       console.log(`🔍 DEBUG [delegateTask] Delegation SUCCESS — agent: ${result.agentId}, response length: ${result.response.length}`)
       return this.formatDelegationResponse(result)
     } catch (error: any) {

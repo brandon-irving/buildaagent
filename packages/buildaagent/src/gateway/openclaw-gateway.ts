@@ -189,7 +189,7 @@ export class OpenClawGateway implements AgentGateway {
    * Delegate a task to a specialized OpenClaw agent.
    * Includes a pre-flight connection check and retry logic for transient failures.
    */
-  async delegateToAgent(taskType: TaskType, message: string): Promise<DelegationResult> {
+  async delegateToAgent(taskType: TaskType, message: string, userId: string = 'anonymous'): Promise<DelegationResult> {
     const agentMap: Record<TaskType, string> = {
       main: this.agentId,
       coder: 'coder',
@@ -227,7 +227,7 @@ export class OpenClawGateway implements AgentGateway {
           body: JSON.stringify({
             model: `openclaw:${targetAgent}`,
             messages: [{ role: 'user', content: message }],
-            user: `delegation-${taskType}-${Date.now()}`
+            user: `buildaagent-${userId}`
           }),
           signal: controller.signal
         })
