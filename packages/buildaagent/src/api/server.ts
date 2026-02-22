@@ -37,7 +37,7 @@ export interface ServerConfig {
 
 export class BuildAAgentServer {
   private app: express.Application
-  private personaEngine: PersonaEngine
+  private personaEngine!: PersonaEngine
   private skillRegistry: SkillRegistry
   private gateway: AgentGateway
   private database: Database

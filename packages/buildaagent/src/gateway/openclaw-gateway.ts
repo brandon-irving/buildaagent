@@ -1,86 +1,93 @@
 /**
  * OpenClawGateway - Integration with OpenClaw agents
  * 
- * Replaces DirectGateway to communicate with OpenClaw sessions instead of 
- * calling LLM APIs directly. Maps mobile users to OpenClaw agent sessions.
+ * Communicates with OpenClaw agents using the CLI instead of managing sessions directly.
+ * Uses the `openclaw agent` command for simple message/response patterns.
  */
 
 import { AgentGateway, HealthCheckResult } from './agent-gateway'
 import { Logger } from '../core/logger'
 
 export interface OpenClawConfig {
-  gatewayUrl: string
+  gatewayUrl?: string // Not needed for CLI, but kept for config compatibility  
   agentId?: string
   model?: string
   sessionPrefix?: string
 }
 
 export class OpenClawGateway implements AgentGateway {
-  private sessions = new Map<string, string>() // userId -> sessionKey
-
   constructor(
     private config: OpenClawConfig,
     private logger: Logger
   ) {}
 
   async generateResponse(context: string, userId: string): Promise<string> {
-    const sessionKey = await this.getOrCreateSession(userId)
+    const agentId = this.config.agentId || 'main'
     
-    this.logger.debug(`Sending message to OpenClaw session: ${sessionKey}`)
+    this.logger.debug(`Sending message to OpenClaw agent: ${agentId} for user: ${userId}`)
 
     try {
-      const response = await fetch(`${this.config.gatewayUrl}/api/sessions/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          sessionKey,
-          message: context,
-          timeoutSeconds: 30
-        })
-      })
+      // Use OpenClaw CLI to send message to agent
+      const { exec } = await import('child_process')
+      const { promisify } = await import('util')
+      const execAsync = promisify(exec)
 
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`OpenClaw session error: ${response.status} ${error}`)
+      // Create a consistent session identifier for each user
+      const sessionId = `buildaagent-${userId}`
+      
+      const command = `openclaw agent --agent "${agentId}" --session-id "${sessionId}" --message "${context.replace(/"/g, '\\"')}" --json --timeout 30`
+      
+      this.logger.debug(`OpenClaw command: ${command}`)
+      
+      const { stdout, stderr } = await execAsync(command)
+      
+      if (stderr) {
+        this.logger.warn(`OpenClaw CLI stderr: ${stderr}`)
       }
 
-      const data = await response.json()
-      
-      if (data.response) {
-        return data.response
+      if (stdout.trim()) {
+        // Parse the JSON response
+        try {
+          const data = JSON.parse(stdout)
+          
+          // Extract the response from OpenClaw's JSON output
+          if (data.response) {
+            return data.response
+          } else if (data.message) {
+            return data.message
+          } else if (data.content) {
+            return data.content
+          } else {
+            // Fallback to raw output
+            return stdout.trim()
+          }
+        } catch (parseError) {
+          this.logger.warn('Failed to parse OpenClaw response as JSON, using raw output')
+          return stdout.trim()
+        }
       } else {
         throw new Error('No response from OpenClaw agent')
       }
     } catch (error: any) {
-      this.logger.error(`OpenClaw gateway error for user ${userId}:`, error)
+      this.logger.error(`OpenClaw CLI error for user ${userId}:`, error)
       throw new Error(`OpenClaw communication failed: ${error.message}`)
     }
   }
 
   async healthCheck(): Promise<HealthCheckResult> {
     try {
-      // Create a controller for timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      // Test if OpenClaw CLI is available and gateway is running
+      const { exec } = await import('child_process')
+      const { promisify } = await import('util')
+      const execAsync = promisify(exec)
 
-      const response = await fetch(`${this.config.gatewayUrl}/api/health`, {
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        return {
-          healthy: false,
-          provider: 'openclaw',
-          error: `Gateway returned ${response.status}`
-        }
-      }
-
+      const { stdout } = await execAsync('openclaw status')
+      
+      // If we can run openclaw status without error, it's healthy
+      const isHealthy = stdout.includes('Gateway') && !stdout.includes('unreachable')
+      
       return {
-        healthy: true,
+        healthy: isHealthy,
         provider: 'openclaw'
       }
     } catch (error: any) {
@@ -90,107 +97,5 @@ export class OpenClawGateway implements AgentGateway {
         error: error.message
       }
     }
-  }
-
-  private async getOrCreateSession(userId: string): Promise<string> {
-    // Check if we already have a session for this user
-    if (this.sessions.has(userId)) {
-      const sessionKey = this.sessions.get(userId)!
-      
-      // Verify session is still active
-      if (await this.isSessionActive(sessionKey)) {
-        return sessionKey
-      } else {
-        this.sessions.delete(userId)
-      }
-    }
-
-    // Create new session
-    const sessionKey = await this.createSession(userId)
-    this.sessions.set(userId, sessionKey)
-    return sessionKey
-  }
-
-  private async createSession(userId: string): Promise<string> {
-    const sessionLabel = `${this.config.sessionPrefix || 'buildaagent'}-${userId}`
-    
-    try {
-      const response = await fetch(`${this.config.gatewayUrl}/api/sessions/spawn`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          task: `You are a helpful assistant for mobile user ${userId}. You have access to Gmail and other integrated services.`,
-          label: sessionLabel,
-          agentId: this.config.agentId,
-          model: this.config.model,
-          cleanup: 'keep' // Keep sessions for continuity
-        })
-      })
-
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`Session spawn error: ${response.status} ${error}`)
-      }
-
-      const data = await response.json()
-      const sessionKey = data.sessionKey
-
-      if (!sessionKey) {
-        throw new Error('No session key returned from spawn')
-      }
-
-      this.logger.info(`Created OpenClaw session for user ${userId}: ${sessionKey}`)
-      return sessionKey
-
-    } catch (error: any) {
-      this.logger.error(`Failed to create OpenClaw session for user ${userId}:`, error)
-      throw error
-    }
-  }
-
-  private async isSessionActive(sessionKey: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.config.gatewayUrl}/api/sessions/list`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'  
-        },
-        body: JSON.stringify({
-          limit: 100
-        })
-      })
-
-      if (!response.ok) {
-        return false
-      }
-
-      const data = await response.json()
-      const sessions = data.sessions || []
-      
-      return sessions.some((session: any) => session.sessionKey === sessionKey)
-    } catch (error) {
-      this.logger.warn(`Failed to check session status for ${sessionKey}:`, error)
-      return false
-    }
-  }
-
-  /**
-   * Clean up inactive sessions periodically
-   */
-  async cleanupSessions(): Promise<void> {
-    const activeSessionKeys = []
-    
-    for (const [userId, sessionKey] of this.sessions.entries()) {
-      if (await this.isSessionActive(sessionKey)) {
-        activeSessionKeys.push(sessionKey)
-      } else {
-        this.sessions.delete(userId)
-        this.logger.info(`Cleaned up inactive session for user ${userId}`)
-      }
-    }
-
-    this.logger.debug(`Active sessions: ${activeSessionKeys.length}`)
   }
 }

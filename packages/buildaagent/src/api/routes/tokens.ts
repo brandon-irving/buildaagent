@@ -20,14 +20,14 @@ export function createTokenBridgeRouter(tokenStore: TokenStore, logger: Logger):
    */
   router.get('/:service/access-token', async (req: Request, res: Response) => {
     try {
-      const { service } = req.params
+      const service = req.params.service as string
       const userId = req.query.user_id as string
 
       if (!userId) {
         return res.status(400).json({ error: 'Missing required query parameter: user_id' })
       }
 
-      if (!['gmail'].includes(service.toLowerCase())) {
+      if (!service || !['gmail'].includes(service.toLowerCase())) {
         return res.status(400).json({ error: `Unsupported service: ${service}` })
       }
 
