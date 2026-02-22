@@ -1,99 +1,133 @@
 /**
- * OpenClawGateway - Integration with OpenClaw agents
+ * OpenClaw Gateway - VPS-Ready Agent Communication
  * 
- * Communicates with OpenClaw agents using the CLI instead of managing sessions directly.
- * Uses the `openclaw agent` command for simple message/response patterns.
+ * Connects BuildAAgent to OpenClaw agents via OpenAI-compatible HTTP endpoint.
+ * Designed for reliable VPS deployment with proper authentication and session management.
  */
 
 import { AgentGateway, HealthCheckResult } from './agent-gateway'
 import { Logger } from '../core/logger'
 
 export interface OpenClawConfig {
-  gatewayUrl?: string // Not needed for CLI, but kept for config compatibility  
+  gatewayUrl?: string
   agentId?: string
   model?: string
   sessionPrefix?: string
+  authToken?: string
+  timeout?: number
+}
+
+interface OpenAIResponse {
+  choices: Array<{
+    message: {
+      content: string
+    }
+  }>
 }
 
 export class OpenClawGateway implements AgentGateway {
+  private gatewayUrl: string
+  private agentId: string
+  private authToken?: string
+  private timeout: number
+
   constructor(
     private config: OpenClawConfig,
     private logger: Logger
-  ) {}
+  ) {
+    this.gatewayUrl = config.gatewayUrl || 'http://localhost:18789'
+    this.agentId = config.agentId || 'main'
+    this.authToken = config.authToken
+    this.timeout = config.timeout || 45000
+  }
 
-  async generateResponse(context: string, userId: string): Promise<string> {
-    const agentId = this.config.agentId || 'main'
-    
-    this.logger.debug(`Sending message to OpenClaw agent: ${agentId} for user: ${userId}`)
+  async generateResponse(message: string, userId: string): Promise<string> {
+    this.logger.info(`Sending message to OpenClaw agent: ${this.agentId} for user: ${userId}`)
+
+    if (!this.authToken) {
+      throw new Error('Auth token required for OpenClaw OpenAI API')
+    }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
     try {
-      // Use OpenClaw CLI to send message to agent
-      const { exec } = await import('child_process')
-      const { promisify } = await import('util')
-      const execAsync = promisify(exec)
+      this.logger.info('Using OpenClaw OpenAI API endpoint')
+      
+      const response = await fetch(`${this.gatewayUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: `openclaw:${this.agentId}`,
+          messages: [{ role: 'user', content: message }],
+          user: userId // For session persistence
+        }),
+        signal: controller.signal
+      })
 
-      // Create a consistent session identifier for each user
-      const sessionId = `buildaagent-${userId}`
-      
-      const command = `openclaw agent --agent "${agentId}" --session-id "${sessionId}" --message "${context.replace(/"/g, '\\"')}" --json --timeout 30`
-      
-      this.logger.debug(`OpenClaw command: ${command}`)
-      
-      const { stdout, stderr } = await execAsync(command)
-      
-      if (stderr) {
-        this.logger.warn(`OpenClaw CLI stderr: ${stderr}`)
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      if (stdout.trim()) {
-        // Parse the JSON response
-        try {
-          const data = JSON.parse(stdout)
-          
-          // Extract the response from OpenClaw's JSON output
-          if (data.response) {
-            return data.response
-          } else if (data.message) {
-            return data.message
-          } else if (data.content) {
-            return data.content
-          } else {
-            // Fallback to raw output
-            return stdout.trim()
-          }
-        } catch (parseError) {
-          this.logger.warn('Failed to parse OpenClaw response as JSON, using raw output')
-          return stdout.trim()
-        }
+      const data = await response.json() as OpenAIResponse
+      
+      if (data.choices && data.choices.length > 0) {
+        const result = data.choices[0].message.content
+        this.logger.info(`OpenClaw response received (${result.length} chars)`)
+        return result
       } else {
-        throw new Error('No response from OpenClaw agent')
+        throw new Error('Unexpected OpenAI response format')
       }
     } catch (error: any) {
-      this.logger.error(`OpenClaw CLI error for user ${userId}:`, error)
+      this.logger.error(`OpenClaw OpenAI API error: ${error.message}`)
       throw new Error(`OpenClaw communication failed: ${error.message}`)
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
   async healthCheck(): Promise<HealthCheckResult> {
-    try {
-      // Test if OpenClaw CLI is available and gateway is running
-      const { exec } = await import('child_process')
-      const { promisify } = await import('util')
-      const execAsync = promisify(exec)
+    if (!this.authToken) {
+      return {
+        healthy: false,
+        provider: 'openclaw-simple',
+        error: 'No auth token'
+      }
+    }
 
-      const { stdout } = await execAsync('openclaw status')
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
       
-      // If we can run openclaw status without error, it's healthy
-      const isHealthy = stdout.includes('Gateway') && !stdout.includes('unreachable')
+      const response = await fetch(`${this.gatewayUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: `openclaw:${this.agentId}`,
+          messages: [{ role: 'user', content: 'health check' }],
+          user: 'health-check'
+        }),
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
       
       return {
-        healthy: isHealthy,
-        provider: 'openclaw'
+        healthy: response.ok,
+        provider: 'openclaw-openai-api'
       }
+      
     } catch (error: any) {
       return {
         healthy: false,
-        provider: 'openclaw',
+        provider: 'openclaw-openai-api',
         error: error.message
       }
     }
