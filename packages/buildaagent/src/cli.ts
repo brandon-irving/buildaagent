@@ -8,11 +8,12 @@
 import dotenv from 'dotenv'
 import path from 'path'
 
-// Load env files: package-level first, then monorepo root as fallback
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
-dotenv.config({ path: path.resolve(process.cwd(), '.env') })
-dotenv.config({ path: path.resolve(process.cwd(), '../../.env.local') })
-dotenv.config({ path: path.resolve(process.cwd(), '../../.env') })
+// Monorepo root is 3 levels up from this file (src/cli.ts -> packages/buildaagent -> root)
+const MONOREPO_ROOT = path.resolve(__dirname, '..', '..', '..')
+
+// Load env from monorepo root (single source of truth)
+dotenv.config({ path: path.join(MONOREPO_ROOT, '.env.local') })
+dotenv.config({ path: path.join(MONOREPO_ROOT, '.env') })
 
 import { BuildAAgentServer, ServerConfig } from './api/server'
 
