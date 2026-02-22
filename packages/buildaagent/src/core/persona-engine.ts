@@ -124,13 +124,21 @@ export class PersonaEngine {
 
     try {
       // Try agent delegation first (OpenClaw multi-agent orchestration)
+      console.log(`🔍 DEBUG [processMessage] Gateway type: ${this.gateway.constructor.name}`)
+      console.log(`🔍 DEBUG [processMessage] Is OpenClawGateway? ${this.gateway instanceof OpenClawGateway}`)
+      console.log(`🔍 DEBUG [processMessage] Attempting delegation for message: "${message.substring(0, 80)}..."`)
+
       const delegated = await this.delegateTask(message, userId)
+
+      console.log(`🔍 DEBUG [processMessage] Delegation result: ${delegated ? 'SUCCESS' : 'NULL (falling back to direct)'}`)
       if (delegated) {
+        console.log(`🔍 DEBUG [processMessage] Delegated to agent: ${delegated.delegatedAgent}, response length: ${delegated.message.length}`)
         await this.storeConversation(message, delegated.message, userId, undefined, delegated.delegatedAgent)
         return delegated
       }
 
       // Fallback: skill execution + direct LLM response
+      console.log(`🔍 DEBUG [processMessage] Falling back to skill execution + direct LLM`)
       const skillResult = await this.tryExecuteSkill(message, userId)
 
       // Build context for the LLM
@@ -324,19 +332,30 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
    * Replaces keyword matching with LLM-powered intent analysis.
    */
   private async orchestrateTask(message: string): Promise<TaskType> {
+    console.log(`🔍 DEBUG [orchestrateTask] Entry — message: "${message.substring(0, 80)}"`)
     try {
       const prompt = `${ORCHESTRATOR_PROMPT}\n\nUser request: "${message}"`
+      console.log(`🔍 DEBUG [orchestrateTask] Sending orchestration prompt to LLM (${prompt.length} chars)`)
+      console.log(`🔍 DEBUG [orchestrateTask] Full prompt:\n${prompt}`)
+
       const decision = await this.routeWithLLM(prompt)
+      console.log(`🔍 DEBUG [orchestrateTask] Raw LLM decision: "${decision}"`)
+
       const agent = decision.trim().toLowerCase().replace(/[^a-z]/g, '') as TaskType
+      console.log(`🔍 DEBUG [orchestrateTask] Cleaned agent name: "${agent}"`)
 
       if (['main', 'coder', 'marketing'].includes(agent)) {
+        console.log(`🔍 DEBUG [orchestrateTask] Valid agent — returning "${agent}"`)
         this.logger.info(`Mega orchestrator decided: "${agent}"`)
         return agent
       }
 
+      console.log(`🔍 DEBUG [orchestrateTask] UNEXPECTED agent "${decision}" — defaulting to main`)
       this.logger.warn(`Mega returned unexpected agent "${decision}", defaulting to main`)
       return 'main'
     } catch (error: any) {
+      console.log(`🔍 DEBUG [orchestrateTask] FAILED — error: ${error.message}`)
+      console.log(`🔍 DEBUG [orchestrateTask] Error stack: ${error.stack}`)
       this.logger.warn(`Orchestrator failed, defaulting to main: ${error.message}`)
       return 'main'
     }
@@ -348,21 +367,35 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
    * Only works when the gateway is an OpenClawGateway instance.
    */
   private async delegateTask(message: string, userId: string): Promise<MessageResponse | null> {
+    console.log(`🔍 DEBUG [delegateTask] Entry — gateway constructor: ${this.gateway.constructor.name}`)
+    console.log(`🔍 DEBUG [delegateTask] gateway instanceof OpenClawGateway: ${this.gateway instanceof OpenClawGateway}`)
+    console.log(`🔍 DEBUG [delegateTask] gateway proto chain: ${Object.getPrototypeOf(this.gateway)?.constructor?.name}`)
+
     if (!(this.gateway instanceof OpenClawGateway)) {
+      console.log(`🔍 DEBUG [delegateTask] EXITING EARLY — gateway is NOT OpenClawGateway, returning null`)
+      console.log(`🔍 DEBUG [delegateTask] OpenClawGateway class ref: ${OpenClawGateway.name}`)
+      console.log(`🔍 DEBUG [delegateTask] Imported OpenClawGateway module path check — this is a potential dual-module issue`)
       return null
     }
 
+    console.log(`🔍 DEBUG [delegateTask] Gateway IS OpenClawGateway — proceeding with orchestration`)
+
     const taskType = await this.orchestrateTask(message)
+    console.log(`🔍 DEBUG [delegateTask] Orchestrator chose taskType: "${taskType}"`)
 
     // Build persona-aware prompt for the delegated agent
     const delegationPrompt = this.persona
       ? `[Persona: ${this.persona.name} | Tone: ${this.persona.behavior.tone}]\n\nUser request: ${message}`
       : message
+    console.log(`🔍 DEBUG [delegateTask] Delegation prompt (first 120 chars): "${delegationPrompt.substring(0, 120)}"`)
 
     try {
+      console.log(`🔍 DEBUG [delegateTask] Calling gateway.delegateToAgent("${taskType}", ...)`)
       const result = await this.gateway.delegateToAgent(taskType, delegationPrompt)
+      console.log(`🔍 DEBUG [delegateTask] Delegation SUCCESS — agent: ${result.agentId}, response length: ${result.response.length}`)
       return this.formatDelegationResponse(result)
     } catch (error: any) {
+      console.log(`🔍 DEBUG [delegateTask] Delegation FAILED — error: ${error.message}`)
       this.logger.warn(`Agent delegation failed, falling back to default flow: ${error.message}`)
       return null
     }
