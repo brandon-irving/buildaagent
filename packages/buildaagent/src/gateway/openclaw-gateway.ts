@@ -8,6 +8,14 @@
 import { AgentGateway, HealthCheckResult } from './agent-gateway'
 import { Logger } from '../core/logger'
 
+export type TaskType = 'main' | 'coder' | 'marketing'
+
+export interface DelegationResult {
+  taskType: TaskType
+  agentId: string
+  response: string
+}
+
 export interface OpenClawConfig {
   gatewayUrl?: string
   agentId?: string
@@ -85,6 +93,64 @@ export class OpenClawGateway implements AgentGateway {
     } catch (error: any) {
       this.logger.error(`OpenClaw OpenAI API error: ${error.message}`)
       throw new Error(`OpenClaw communication failed: ${error.message}`)
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
+  /**
+   * Delegate a task to a specialized OpenClaw agent via sessions_spawn.
+   * Routes to the appropriate agent based on taskType.
+   */
+  async delegateToAgent(taskType: TaskType, message: string): Promise<DelegationResult> {
+    const agentMap: Record<TaskType, string> = {
+      main: this.agentId,
+      coder: 'coder',
+      marketing: 'marketing'
+    }
+
+    const targetAgent = agentMap[taskType]
+    this.logger.info(`Delegating "${taskType}" task to agent: ${targetAgent}`)
+
+    if (!this.authToken) {
+      throw new Error('Auth token required for agent delegation')
+    }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
+    try {
+      const response = await fetch(`${this.gatewayUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: `openclaw:${targetAgent}`,
+          messages: [{ role: 'user', content: message }],
+          user: `delegation-${taskType}-${Date.now()}`
+        }),
+        signal: controller.signal
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const data = await response.json() as OpenAIResponse
+
+      if (data.choices && data.choices.length > 0) {
+        const result = data.choices[0].message.content
+        this.logger.info(`Agent "${targetAgent}" responded (${result.length} chars)`)
+        return { taskType, agentId: targetAgent, response: result }
+      } else {
+        throw new Error('Unexpected response format from delegated agent')
+      }
+    } catch (error: any) {
+      this.logger.error(`Agent delegation failed (${targetAgent}): ${error.message}`)
+      throw new Error(`Delegation to "${targetAgent}" failed: ${error.message}`)
     } finally {
       clearTimeout(timeoutId)
     }

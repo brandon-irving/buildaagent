@@ -7,6 +7,7 @@
 
 import { SkillRegistry, SkillExecutionResult } from './skill-registry'
 import { AgentGateway } from '../gateway/agent-gateway'
+import { OpenClawGateway, TaskType, DelegationResult } from '../gateway/openclaw-gateway'
 import { MockDatabase as Database } from './mock-database'
 import { Logger } from './logger'
 
@@ -33,6 +34,30 @@ export interface MessageResponse {
   message: string
   skillUsed?: string
   persona: string
+  delegatedAgent?: string
+}
+
+/** Keyword patterns for routing messages to specialized agents */
+const TASK_KEYWORDS: Record<TaskType, string[]> = {
+  coder: [
+    'code', 'coding', 'program', 'programming', 'debug', 'debugging',
+    'function', 'api', 'endpoint', 'database', 'deploy', 'deployment',
+    'bug', 'error', 'fix', 'build', 'compile', 'test', 'refactor',
+    'javascript', 'typescript', 'python', 'react', 'node', 'sql',
+    'git', 'commit', 'repository', 'docker', 'server', 'frontend',
+    'backend', 'css', 'html', 'component', 'script', 'package',
+    'dependency', 'devops', 'ci/cd', 'pipeline'
+  ],
+  marketing: [
+    'marketing', 'content', 'blog', 'post', 'social media', 'seo',
+    'campaign', 'brand', 'branding', 'audience', 'engagement',
+    'newsletter', 'email blast', 'copywriting', 'copy', 'headline',
+    'tagline', 'slogan', 'ad', 'advertisement', 'promotion',
+    'instagram', 'twitter', 'linkedin', 'tiktok', 'facebook',
+    'analytics', 'conversion', 'funnel', 'growth', 'viral',
+    'influencer', 'outreach', 'press release', 'launch'
+  ],
+  main: [] // default fallback, no keywords needed
 }
 
 export class PersonaEngine {
@@ -106,18 +131,25 @@ export class PersonaEngine {
     })
 
     try {
-      // Check if message requires skill execution
+      // Try agent delegation first (OpenClaw multi-agent orchestration)
+      const delegated = await this.delegateTask(message, userId)
+      if (delegated) {
+        await this.storeConversation(message, delegated.message, userId, undefined, delegated.delegatedAgent)
+        return delegated
+      }
+
+      // Fallback: skill execution + direct LLM response
       const skillResult = await this.tryExecuteSkill(message, userId)
-      
+
       // Build context for the LLM
       const context = this.buildPersonaContext(message, skillResult)
-      
+
       // Generate response via AgentGateway
       const response = await this.gateway.generateResponse(context, userId)
-      
+
       // Store conversation in database
       await this.storeConversation(message, response, userId, skillResult?.skillName)
-      
+
       return {
         message: response,
         skillUsed: skillResult?.skillName,
@@ -227,10 +259,11 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
   }
 
   private async storeConversation(
-    userMessage: string, 
-    agentResponse: string, 
-    userId: string, 
-    skillUsed?: string
+    userMessage: string,
+    agentResponse: string,
+    userId: string,
+    skillUsed?: string,
+    delegatedAgent?: string
   ): Promise<void> {
     try {
       await this.database.storeConversation({
@@ -238,7 +271,7 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
         userMessage,
         agentResponse,
         persona: this.currentPersona!,
-        skillUsed,
+        skillUsed: skillUsed || delegatedAgent,
         timestamp: new Date().toISOString()
       })
     } catch (error) {
@@ -292,6 +325,73 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
 
     const data = await response.json() as { content: Array<{ text: string }> }
     return data.content[0]?.text || 'none'
+  }
+
+  /**
+   * Categorize a user message into a task type based on keyword matching.
+   * Returns the best-matching specialized agent, or 'main' as fallback.
+   */
+  categorizeTask(message: string): TaskType {
+    const lower = message.toLowerCase()
+
+    let bestType: TaskType = 'main'
+    let bestScore = 0
+
+    for (const taskType of ['coder', 'marketing'] as TaskType[]) {
+      const keywords = TASK_KEYWORDS[taskType]
+      const score = keywords.filter(kw => lower.includes(kw)).length
+      if (score > bestScore) {
+        bestScore = score
+        bestType = taskType
+      }
+    }
+
+    this.logger.info(`Task categorized as "${bestType}" (score: ${bestScore})`)
+    return bestType
+  }
+
+  /**
+   * Delegate a message to a specialized OpenClaw agent.
+   * Only works when the gateway is an OpenClawGateway instance.
+   */
+  private async delegateTask(message: string, userId: string): Promise<MessageResponse | null> {
+    if (!(this.gateway instanceof OpenClawGateway)) {
+      return null
+    }
+
+    const taskType = this.categorizeTask(message)
+
+    // Build persona-aware prompt for the delegated agent
+    const delegationPrompt = this.persona
+      ? `[Persona: ${this.persona.name} | Tone: ${this.persona.behavior.tone}]\n\nUser request: ${message}`
+      : message
+
+    try {
+      const result = await this.gateway.delegateToAgent(taskType, delegationPrompt)
+      return this.formatDelegationResponse(result)
+    } catch (error: any) {
+      this.logger.warn(`Agent delegation failed, falling back to default flow: ${error.message}`)
+      return null
+    }
+  }
+
+  /**
+   * Format a DelegationResult into a mobile-friendly MessageResponse.
+   */
+  private formatDelegationResponse(result: DelegationResult): MessageResponse {
+    const agentLabels: Record<TaskType, string> = {
+      main: 'General Assistant',
+      coder: 'Code Specialist',
+      marketing: 'Marketing Specialist'
+    }
+
+    const label = agentLabels[result.taskType]
+
+    return {
+      message: `**${label}** · ${result.response}`,
+      persona: this.currentPersona!,
+      delegatedAgent: result.agentId
+    }
   }
 
   async stop(): Promise<void> {
