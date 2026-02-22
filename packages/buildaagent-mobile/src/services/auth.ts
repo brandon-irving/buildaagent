@@ -13,12 +13,13 @@ import {
   isErrorWithCode,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import { GOOGLE_CLIENT_ID } from '../config';
+import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '../config';
 import { apiService } from './api';
 
 // Configure once at app startup
 GoogleSignin.configure({
   webClientId: GOOGLE_CLIENT_ID,
+  iosClientId: GOOGLE_IOS_CLIENT_ID,
   offlineAccess: true, // needed to get serverAuthCode for backend token exchange
   scopes: [
     'https://www.googleapis.com/auth/gmail.readonly',

@@ -137,34 +137,48 @@ export class PersonaEngine {
   private async tryExecuteSkill(message: string, userId: string): Promise<SkillExecutionResult | null> {
     if (!this.persona) return null
 
-    // Simple skill detection - check if message contains skill-related keywords
-    const skillKeywords = {
-      'web-search': ['search', 'find', 'look up', 'what is', 'who is', 'google'],
-      'weather-check': ['weather', 'temperature', 'forecast', 'rain', 'sunny', 'cloudy'],
-      'email-manager': ['email', 'send email', 'check email', 'inbox'],
-      'calendar-sync': ['calendar', 'schedule', 'meeting', 'appointment']
-    }
+    // Build a list of available skills with descriptions for the LLM
+    const availableSkills = this.persona.skills
+      .filter(name => this.skillRegistry.hasSkill(name))
+      .map(name => {
+        const manifest = this.skillRegistry.getSkillManifest(name)
+        return `- ${name}: ${manifest?.description || 'No description'}`
+      })
 
-    const messageLower = message.toLowerCase()
-    
-    for (const [skillName, keywords] of Object.entries(skillKeywords)) {
-      if (this.persona.skills.includes(skillName)) {
-        const hasKeyword = keywords.some(keyword => messageLower.includes(keyword))
-        
-        if (hasKeyword) {
-          try {
-            return await this.skillRegistry.executeSkill(skillName, { 
-              query: message,
-              userId 
-            })
-          } catch (error) {
-            this.logger.warn(`Skill ${skillName} execution failed:`, error)
-          }
-        }
+    if (availableSkills.length === 0) return null
+
+    // Ask the LLM which skill (if any) to use
+    const routingPrompt = `You are a skill router. Given a user message and available skills, decide which skill to use.
+
+Available skills:
+${availableSkills.join('\n')}
+
+User message: "${message}"
+
+Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is needed. Do not explain.`
+
+    try {
+      const decision = await this.routeWithLLM(routingPrompt)
+      const skillName = decision.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
+
+      this.logger.info(`Skill router decided: ${skillName}`)
+
+      if (skillName === 'none' || !this.skillRegistry.hasSkill(skillName)) {
+        return null
       }
-    }
 
-    return null
+      if (!this.persona.skills.includes(skillName)) {
+        return null
+      }
+
+      return await this.skillRegistry.executeSkill(skillName, {
+        query: message,
+        userId
+      })
+    } catch (error: any) {
+      this.logger.warn('Skill routing failed, proceeding without skill:', error)
+      return null
+    }
   }
 
   private buildPersonaContext(message: string, skillResult?: SkillExecutionResult | null): string {
@@ -246,6 +260,38 @@ export class PersonaEngine {
       healthy: this.persona !== null,
       persona: this.currentPersona || undefined
     }
+  }
+
+  /**
+   * Fast LLM call for skill routing — uses haiku-level model with minimal tokens
+   */
+  private async routeWithLLM(prompt: string): Promise<string> {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      throw new Error('No ANTHROPIC_API_KEY for routing')
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 20,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Routing LLM error: ${response.status} ${error}`)
+    }
+
+    const data = await response.json() as { content: Array<{ text: string }> }
+    return data.content[0]?.text || 'none'
   }
 
   async stop(): Promise<void> {

@@ -17,8 +17,8 @@ class ApiService {
   constructor() {
     this.baseURL = API_CONFIG.baseURL;
     
-    // Configure axios defaults
-    axios.defaults.timeout = 10000;
+    // Configure axios defaults (30s for LLM + Gmail API calls)
+    axios.defaults.timeout = 30000;
     axios.defaults.headers.common['Content-Type'] = 'application/json';
   }
 
@@ -66,7 +66,9 @@ class ApiService {
 
   async sendChatMessage(request: ChatRequest): Promise<ApiResponse<ChatResponse>> {
     try {
-      const response = await axios.post(`${this.baseURL}${API_CONFIG.endpoints.chat}`, request);
+      const response = await axios.post(`${this.baseURL}${API_CONFIG.endpoints.chat}`, request, {
+        timeout: 60000, // 60s — routing LLM + Gmail API + response LLM
+      });
       return {
         success: true,
         data: response.data,
