@@ -12,6 +12,10 @@ import { SkillRegistry } from '../core/skill-registry'
 import { AgentGateway, DirectGateway } from '../gateway/agent-gateway'
 import { MockDatabase as Database } from '../core/mock-database'
 import { Logger } from '../core/logger'
+import { TokenStore } from '../services/token-store'
+import { GmailService } from '../services/gmail/gmail-service'
+import { createEmailManagerExecutor } from '../skills/email-manager/executor'
+import { createAuthRouter } from './routes/auth'
 
 export interface ServerConfig {
   port: number
@@ -31,6 +35,8 @@ export class BuildAAgentServer {
   private database: Database
   private logger: Logger
   private server: any
+  private tokenStore: TokenStore | null = null
+  private gmailService: GmailService
 
   constructor(private config: ServerConfig) {
     this.app = express()
@@ -38,9 +44,26 @@ export class BuildAAgentServer {
     this.database = new Database('api-server', config.workspacePath)
     this.skillRegistry = new SkillRegistry(this.logger)
     this.gateway = new DirectGateway(config.aiProvider, config.aiKeyRef)
-    
+    this.gmailService = new GmailService(this.logger)
+
     this.setupMiddleware()
+    this.setupGmailIntegration()
     this.setupRoutes()
+  }
+
+  private setupGmailIntegration(): void {
+    const encryptionKey = process.env.TOKEN_ENCRYPTION_KEY
+    if (!encryptionKey) {
+      this.logger.warn('TOKEN_ENCRYPTION_KEY not set — Gmail integration disabled')
+      return
+    }
+
+    try {
+      this.tokenStore = new TokenStore(this.database, this.logger, encryptionKey)
+      this.logger.info('Gmail integration enabled')
+    } catch (error: any) {
+      this.logger.warn(`Gmail integration setup failed: ${error.message}`)
+    }
   }
 
   private setupMiddleware(): void {
@@ -120,6 +143,39 @@ export class BuildAAgentServer {
       } catch (error) {
         this.logger.error('Error processing chat message:', error)
         res.status(500).json({ error: 'Failed to process message' })
+      }
+    })
+
+    // Auth routes (Gmail OAuth)
+    if (this.tokenStore) {
+      this.app.use('/api/auth', createAuthRouter(this.tokenStore, this.logger))
+    }
+
+    // Services status endpoint
+    this.app.get('/api/services/status', async (req, res) => {
+      try {
+        const userId = req.query.user_id as string
+        if (!userId) {
+          return res.status(400).json({ error: 'Missing required query parameter: user_id' })
+        }
+
+        const gmail = this.tokenStore
+          ? {
+              enabled: true,
+              connected: await this.tokenStore.hasValidConnection(userId, 'gmail'),
+              email: await this.tokenStore.getConnectionEmail(userId, 'gmail')
+            }
+          : { enabled: false, connected: false, email: null }
+
+        res.json({
+          services: {
+            gmail,
+            calendar: { enabled: false, connected: false }
+          }
+        })
+      } catch (error: any) {
+        this.logger.error('Services status error:', error)
+        res.status(500).json({ error: 'Failed to get services status' })
       }
     })
 
@@ -243,7 +299,30 @@ export class BuildAAgentServer {
       // Initialize core systems
       await this.database.init()
       await this.skillRegistry.loadSkills(this.config.skillsPath)
-      
+
+      // Register real email-manager skill (replaces placeholder)
+      if (this.tokenStore) {
+        const emailExecutor = createEmailManagerExecutor(
+          this.tokenStore,
+          this.gmailService,
+          this.logger
+        )
+        this.skillRegistry.registerExternalSkill(
+          {
+            name: 'email-manager',
+            version: '1.0.0',
+            description: 'Gmail integration for reading, sending, and organizing emails',
+            capabilities: [
+              { name: 'read', description: 'Read recent emails', parameters: [] },
+              { name: 'send', description: 'Send an email', parameters: [] },
+              { name: 'unread_count', description: 'Get unread email count', parameters: [] },
+              { name: 'search', description: 'Search emails', parameters: [] }
+            ]
+          },
+          emailExecutor
+        )
+      }
+
       // Start HTTP server
       this.server = this.app.listen(this.config.port, () => {
         this.logger.info(`🚀 BuildAAgent API Server running on port ${this.config.port}`)
@@ -253,6 +332,12 @@ export class BuildAAgentServer {
         this.logger.info(`   GET  /api/personas - List available personas`)
         this.logger.info(`   GET  /api/personas/:id - Get persona details`)
         this.logger.info(`   POST /api/chat - Chat with agent`)
+        if (this.tokenStore) {
+          this.logger.info(`   POST /api/auth/gmail/callback - Gmail OAuth callback`)
+          this.logger.info(`   GET  /api/auth/gmail/status - Gmail connection status`)
+          this.logger.info(`   POST /api/auth/gmail/disconnect - Disconnect Gmail`)
+          this.logger.info(`   GET  /api/services/status - Connected services status`)
+        }
       })
     } catch (error) {
       this.logger.error('❌ Failed to start server:', error)

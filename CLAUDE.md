@@ -178,6 +178,60 @@ first_message: "Hey! I'm your personal assistant..."
 - **AI Integration**: Anthropic & OpenAI support via DirectGateway
 - **Database**: SQLite for conversation history and user preferences
 
+### ✅ Gmail Integration (Complete)
+Real email-manager skill replacing the placeholder. Full OAuth flow with encrypted token storage.
+
+**Backend files:**
+- `src/services/gmail/types.ts` — OAuth, email, and label types
+- `src/services/token-store.ts` — AES-256-GCM encrypted token storage with auto-refresh
+- `src/services/gmail/gmail-service.ts` — Gmail REST API client (fetch-based, no googleapis dep)
+- `src/skills/email-manager/executor.ts` — Intent detection (read/send/count/search) + Gmail execution
+- `src/api/routes/auth.ts` — OAuth callback, status, disconnect endpoints
+
+**New endpoints:**
+- `POST /api/auth/gmail/callback` — Exchange auth code for encrypted tokens
+- `GET /api/auth/gmail/status?user_id=` — Check connection status
+- `POST /api/auth/gmail/disconnect` — Revoke + delete tokens
+- `GET /api/services/status?user_id=` — All service statuses
+
+**Mobile files:**
+- `src/services/auth.ts` — Native Google Sign-In via `@react-native-google-signin/google-signin`
+- `src/screens/SettingsScreen.tsx` — Connected Services UI (connect/disconnect Gmail)
+- `App.tsx` — Bottom tab navigator (Chat + Settings)
+
+**Security:** PKCE, AES-256-GCM at rest, auto token refresh, Google revocation on disconnect, graceful disable if `TOKEN_ENCRYPTION_KEY` not set.
+
+### 🔧 Gmail Setup Guide
+
+#### 1. Google Cloud Console
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project (or select existing)
+3. Enable the **Gmail API** (APIs & Services → Library)
+4. Go to **APIs & Services → Credentials**
+5. Create OAuth 2.0 Client ID — type **Web application** (for backend token exchange)
+   - Note the **Client ID** and **Client Secret**
+6. Create OAuth 2.0 Client ID — type **iOS** (for native sign-in)
+   - Note the **iOS URL scheme** (looks like `com.googleusercontent.apps.XXXX`)
+7. Configure OAuth consent screen with scopes: `gmail.readonly`, `gmail.send`, `gmail.labels`, `userinfo.email`
+
+#### 2. Backend Environment (`.env.local`)
+```bash
+GOOGLE_CLIENT_ID=<Web client ID from step 5>
+GOOGLE_CLIENT_SECRET=<Web client secret from step 5>
+TOKEN_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+```
+
+#### 3. Mobile Configuration
+- Set `GOOGLE_CLIENT_ID` in `packages/buildaagent-mobile/src/config.ts` to your **Web** client ID
+- Set `iosUrlScheme` in `packages/buildaagent-mobile/app.json` plugin config to the iOS URL scheme from step 6
+
+#### 4. Dev Build (required — won't work in Expo Go)
+```bash
+cd packages/buildaagent-mobile
+npx expo prebuild --clean
+npx expo run:ios   # or run:android
+```
+
 ### 🎯 Ready for Testing
 ```bash
 cd packages/buildaagent
@@ -188,19 +242,14 @@ npm run dev
 
 API available at: http://localhost:3000
 
-### 📱 Next: Mobile App Integration
-Brandon can now:
-1. Initialize React Native app in `packages/buildaagent-mobile/`
-2. Connect to http://localhost:3000
-3. Test persona switching (Personal Assistant ↔ Content Creator)
-4. Verify behavior differences via `/api/chat` endpoint
-
 ## 📝 Notes & Decisions
 
 - **2026-02-21**: Architecture pivot to React Native client
+- **2026-02-21**: Gmail integration implemented (backend + mobile)
+- **2026-02-21**: Switched from `expo-auth-session` to `@react-native-google-signin/google-signin` for native sign-in UX (avoids redirect URI issues with Expo Go, requires dev build)
 - **Domain**: Will register buildaagent.io through Hostinger
 - **Deployment**: Hostinger VPS + Docker for tenant isolation
-- **Skills**: Start with web-search (no auth), then email/calendar
+- **Skills**: Web search + weather check (working), email-manager (working with Gmail), calendar (placeholder)
 
 ---
 

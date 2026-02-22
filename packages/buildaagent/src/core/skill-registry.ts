@@ -215,6 +215,16 @@ export class SkillRegistry {
            `Currently showing placeholder response for testing purposes.`
   }
 
+  /**
+   * Register an external skill, replacing any existing registration (including placeholders).
+   * Used to wire real skill implementations (like Gmail) at server startup.
+   */
+  registerExternalSkill(manifest: SkillManifest, executor: (params: SkillExecutionParams) => Promise<string>): void {
+    this.skills.set(manifest.name, manifest)
+    this.skillExecutors.set(manifest.name, executor)
+    this.logger.info(`Registered external skill: ${manifest.name} v${manifest.version}`)
+  }
+
   getAvailableSkills(): string[] {
     return Array.from(this.skills.keys())
   }

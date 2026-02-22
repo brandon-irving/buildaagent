@@ -37,3 +37,35 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
 }
+
+// --- Service / Auth Types ---
+
+export interface GmailCallbackRequest {
+  code: string;
+  code_verifier?: string;
+  redirect_uri: string;
+  user_id: string;
+}
+
+export interface GmailCallbackResponse {
+  connected: boolean;
+  email: string;
+}
+
+export interface GmailStatusResponse {
+  connected: boolean;
+  email: string | null;
+}
+
+export interface ServiceStatus {
+  enabled: boolean;
+  connected: boolean;
+  email?: string | null;
+}
+
+export interface ServicesStatusResponse {
+  services: {
+    gmail: ServiceStatus;
+    calendar: ServiceStatus;
+  };
+}

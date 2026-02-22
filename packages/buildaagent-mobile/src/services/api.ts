@@ -1,6 +1,15 @@
 import axios from 'axios';
 import { API_CONFIG } from '../config';
-import { Persona, ChatRequest, ChatResponse, ApiResponse } from '../types';
+import {
+  Persona,
+  ChatRequest,
+  ChatResponse,
+  ApiResponse,
+  GmailCallbackRequest,
+  GmailCallbackResponse,
+  GmailStatusResponse,
+  ServicesStatusResponse,
+} from '../types';
 
 class ApiService {
   private baseURL: string;
@@ -68,6 +77,59 @@ class ApiService {
         success: false,
         error: error.message || 'Failed to send message',
       };
+    }
+  }
+  // --- Auth / Services Methods ---
+
+  async gmailCallback(request: GmailCallbackRequest): Promise<ApiResponse<GmailCallbackResponse>> {
+    try {
+      const response = await axios.post(
+        `${this.baseURL}${API_CONFIG.endpoints.authGmailCallback}`,
+        request
+      );
+      return { success: true, data: response.data };
+    } catch (error: any) {
+      console.error('Gmail callback failed:', error);
+      return { success: false, error: error.message || 'Gmail authentication failed' };
+    }
+  }
+
+  async getGmailStatus(userId: string): Promise<ApiResponse<GmailStatusResponse>> {
+    try {
+      const response = await axios.get(
+        `${this.baseURL}${API_CONFIG.endpoints.authGmailStatus}`,
+        { params: { user_id: userId } }
+      );
+      return { success: true, data: response.data };
+    } catch (error: any) {
+      console.error('Gmail status check failed:', error);
+      return { success: false, error: error.message || 'Failed to check Gmail status' };
+    }
+  }
+
+  async disconnectGmail(userId: string): Promise<ApiResponse<{ disconnected: boolean }>> {
+    try {
+      const response = await axios.post(
+        `${this.baseURL}${API_CONFIG.endpoints.authGmailDisconnect}`,
+        { user_id: userId }
+      );
+      return { success: true, data: response.data };
+    } catch (error: any) {
+      console.error('Gmail disconnect failed:', error);
+      return { success: false, error: error.message || 'Failed to disconnect Gmail' };
+    }
+  }
+
+  async getServicesStatus(userId: string): Promise<ApiResponse<ServicesStatusResponse>> {
+    try {
+      const response = await axios.get(
+        `${this.baseURL}${API_CONFIG.endpoints.servicesStatus}`,
+        { params: { user_id: userId } }
+      );
+      return { success: true, data: response.data };
+    } catch (error: any) {
+      console.error('Services status check failed:', error);
+      return { success: false, error: error.message || 'Failed to get services status' };
     }
   }
 }

@@ -7,6 +7,7 @@
 
 import Database from 'better-sqlite3'
 import { Logger } from './logger'
+import { OAuthTokenEntry } from '../services/gmail/types'
 
 export interface ConversationEntry {
   userId: string
@@ -95,6 +96,25 @@ export class Database {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    // OAuth tokens table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS oauth_tokens (
+        user_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        access_token_encrypted TEXT NOT NULL,
+        iv TEXT NOT NULL,
+        auth_tag TEXT NOT NULL,
+        refresh_token_encrypted TEXT NOT NULL,
+        refresh_iv TEXT NOT NULL,
+        refresh_auth_tag TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        scope TEXT NOT NULL,
+        email TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, provider)
       )
     `)
 
@@ -282,6 +302,88 @@ export class Database {
     } catch (error) {
       this.logger.error('Failed to get database stats:', error)
       return { conversations: 0, users: 0 }
+    }
+  }
+
+  // --- OAuth Token Methods ---
+
+  async storeOAuthToken(entry: OAuthTokenEntry): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO oauth_tokens
+          (user_id, provider, access_token_encrypted, iv, auth_tag,
+           refresh_token_encrypted, refresh_iv, refresh_auth_tag,
+           expires_at, scope, email)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run(
+        entry.userId,
+        entry.provider,
+        entry.accessTokenEncrypted,
+        entry.iv,
+        entry.authTag,
+        entry.refreshTokenEncrypted,
+        entry.refreshIv,
+        entry.refreshAuthTag,
+        entry.expiresAt,
+        entry.scope,
+        entry.email
+      )
+
+      this.logger.debug('Stored OAuth token', { userId: entry.userId, provider: entry.provider })
+    } catch (error) {
+      this.logger.error('Failed to store OAuth token:', error)
+      throw error
+    }
+  }
+
+  async getOAuthToken(userId: string, provider: string): Promise<OAuthTokenEntry | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    try {
+      const stmt = this.db.prepare(`
+        SELECT user_id, provider, access_token_encrypted, iv, auth_tag,
+               refresh_token_encrypted, refresh_iv, refresh_auth_tag,
+               expires_at, scope, email
+        FROM oauth_tokens
+        WHERE user_id = ? AND provider = ?
+      `)
+
+      const row = stmt.get(userId, provider) as any
+      if (!row) return null
+
+      return {
+        userId: row.user_id,
+        provider: row.provider,
+        accessTokenEncrypted: row.access_token_encrypted,
+        iv: row.iv,
+        authTag: row.auth_tag,
+        refreshTokenEncrypted: row.refresh_token_encrypted,
+        refreshIv: row.refresh_iv,
+        refreshAuthTag: row.refresh_auth_tag,
+        expiresAt: row.expires_at,
+        scope: row.scope,
+        email: row.email
+      }
+    } catch (error) {
+      this.logger.error('Failed to get OAuth token:', error)
+      throw error
+    }
+  }
+
+  async deleteOAuthToken(userId: string, provider: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    try {
+      const stmt = this.db.prepare(`DELETE FROM oauth_tokens WHERE user_id = ? AND provider = ?`)
+      stmt.run(userId, provider)
+      this.logger.debug('Deleted OAuth token', { userId, provider })
+    } catch (error) {
+      this.logger.error('Failed to delete OAuth token:', error)
+      throw error
     }
   }
 

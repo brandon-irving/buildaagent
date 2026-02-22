@@ -6,6 +6,7 @@
  */
 
 import { Logger } from './logger'
+import { OAuthTokenEntry } from '../services/gmail/types'
 
 export interface ConversationEntry {
   userId: string
@@ -26,6 +27,7 @@ export class MockDatabase {
   private conversations: ConversationEntry[] = []
   private userPreferences = new Map<string, Map<string, string>>()
   private runtimeState = new Map<string, string>()
+  private oauthTokens = new Map<string, OAuthTokenEntry>()
   private logger: Logger
   private firstRun = true
 
@@ -95,6 +97,26 @@ export class MockDatabase {
       conversations: this.conversations.length,
       users: uniqueUsers.size
     }
+  }
+
+  // --- OAuth Token Methods ---
+
+  private oauthKey(userId: string, provider: string): string {
+    return `${userId}:${provider}`
+  }
+
+  async storeOAuthToken(entry: OAuthTokenEntry): Promise<void> {
+    this.oauthTokens.set(this.oauthKey(entry.userId, entry.provider), entry)
+    this.logger.debug('Stored OAuth token', { userId: entry.userId, provider: entry.provider })
+  }
+
+  async getOAuthToken(userId: string, provider: string): Promise<OAuthTokenEntry | null> {
+    return this.oauthTokens.get(this.oauthKey(userId, provider)) || null
+  }
+
+  async deleteOAuthToken(userId: string, provider: string): Promise<void> {
+    this.oauthTokens.delete(this.oauthKey(userId, provider))
+    this.logger.debug('Deleted OAuth token', { userId, provider })
   }
 
   async close(): Promise<void> {
