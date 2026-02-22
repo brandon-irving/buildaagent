@@ -37,28 +37,20 @@ export interface MessageResponse {
   delegatedAgent?: string
 }
 
-/** Keyword patterns for routing messages to specialized agents */
-const TASK_KEYWORDS: Record<TaskType, string[]> = {
-  coder: [
-    'code', 'coding', 'program', 'programming', 'debug', 'debugging',
-    'function', 'api', 'endpoint', 'database', 'deploy', 'deployment',
-    'bug', 'error', 'fix', 'build', 'compile', 'test', 'refactor',
-    'javascript', 'typescript', 'python', 'react', 'node', 'sql',
-    'git', 'commit', 'repository', 'docker', 'server', 'frontend',
-    'backend', 'css', 'html', 'component', 'script', 'package',
-    'dependency', 'devops', 'ci/cd', 'pipeline'
-  ],
-  marketing: [
-    'marketing', 'content', 'blog', 'post', 'social media', 'seo',
-    'campaign', 'brand', 'branding', 'audience', 'engagement',
-    'newsletter', 'email blast', 'copywriting', 'copy', 'headline',
-    'tagline', 'slogan', 'ad', 'advertisement', 'promotion',
-    'instagram', 'twitter', 'linkedin', 'tiktok', 'facebook',
-    'analytics', 'conversion', 'funnel', 'growth', 'viral',
-    'influencer', 'outreach', 'press release', 'launch'
-  ],
-  main: [] // default fallback, no keywords needed
-}
+/** Mega orchestrator prompt — decides which agent should handle each request */
+const ORCHESTRATOR_PROMPT = `You are Mega, the orchestrator. Analyze the user's request and decide which specialist agent should handle it.
+
+Available agents:
+- main: General conversation, Q&A, personal assistance, day-to-day tasks
+- coder: Software development, debugging, code review, architecture, DevOps, technical implementation
+- marketing: Content creation, social media strategy, copywriting, branding, growth, campaigns
+
+Rules:
+- Choose the SINGLE best agent for the request
+- If the request is ambiguous or general, choose "main"
+- Consider the overall intent, not just individual words
+
+Respond with ONLY the agent name: main, coder, or marketing. No explanation.`
 
 export class PersonaEngine {
   private persona: PersonaConfig | null = null
@@ -328,30 +320,31 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
   }
 
   /**
-   * Categorize a user message into a task type based on keyword matching.
-   * Returns the best-matching specialized agent, or 'main' as fallback.
+   * Use Mega orchestrator to intelligently decide which agent should handle a request.
+   * Replaces keyword matching with LLM-powered intent analysis.
    */
-  categorizeTask(message: string): TaskType {
-    const lower = message.toLowerCase()
+  private async orchestrateTask(message: string): Promise<TaskType> {
+    try {
+      const prompt = `${ORCHESTRATOR_PROMPT}\n\nUser request: "${message}"`
+      const decision = await this.routeWithLLM(prompt)
+      const agent = decision.trim().toLowerCase().replace(/[^a-z]/g, '') as TaskType
 
-    let bestType: TaskType = 'main'
-    let bestScore = 0
-
-    for (const taskType of ['coder', 'marketing'] as TaskType[]) {
-      const keywords = TASK_KEYWORDS[taskType]
-      const score = keywords.filter(kw => lower.includes(kw)).length
-      if (score > bestScore) {
-        bestScore = score
-        bestType = taskType
+      if (['main', 'coder', 'marketing'].includes(agent)) {
+        this.logger.info(`Mega orchestrator decided: "${agent}"`)
+        return agent
       }
-    }
 
-    this.logger.info(`Task categorized as "${bestType}" (score: ${bestScore})`)
-    return bestType
+      this.logger.warn(`Mega returned unexpected agent "${decision}", defaulting to main`)
+      return 'main'
+    } catch (error: any) {
+      this.logger.warn(`Orchestrator failed, defaulting to main: ${error.message}`)
+      return 'main'
+    }
   }
 
   /**
    * Delegate a message to a specialized OpenClaw agent.
+   * Uses Mega orchestrator for intelligent routing instead of keyword matching.
    * Only works when the gateway is an OpenClawGateway instance.
    */
   private async delegateTask(message: string, userId: string): Promise<MessageResponse | null> {
@@ -359,7 +352,7 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
       return null
     }
 
-    const taskType = this.categorizeTask(message)
+    const taskType = await this.orchestrateTask(message)
 
     // Build persona-aware prompt for the delegated agent
     const delegationPrompt = this.persona
@@ -380,9 +373,9 @@ Respond with ONLY the skill name (e.g. "email-manager") or "none" if no skill is
    */
   private formatDelegationResponse(result: DelegationResult): MessageResponse {
     const agentLabels: Record<TaskType, string> = {
-      main: 'General Assistant',
-      coder: 'Code Specialist',
-      marketing: 'Marketing Specialist'
+      main: 'Mega ⚡',
+      coder: 'Coder 🛠️',
+      marketing: 'Marketing 📣'
     }
 
     const label = agentLabels[result.taskType]
